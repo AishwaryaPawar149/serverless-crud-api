@@ -1,4 +1,3 @@
-aws_region      = "us-east-1"
+aws_region      = "ap-south-1"
 project_name    = "serverless-crud-api"
-s3_bucket_name  = "my-lambda-artifacts-unique-12345"  # Change this to unique nameo
-
+s3_bucket_name  = "aishwarya-lambda-artifacts-2024"

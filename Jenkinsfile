@@ -2,8 +2,8 @@ pipeline {
     agent any
     
     environment {
-        AWS_DEFAULT_REGION = 'us-east-1'
-        S3_BUCKET = 'my-lambda-artifacts-unique-12345'  // Same as terraform.tfvars
+        AWS_DEFAULT_REGION = 'ap-south-1'
+        S3_BUCKET = 'aishwarya-lambda-artifacts-2024'  // Change this to your unique bucket name
         LAMBDA_ZIP = 'lambda_function.zip'
     }
     
@@ -25,16 +25,38 @@ pipeline {
         
         stage('Upload to S3') {
             steps {
-                sh '''
-                    aws s3 cp ${LAMBDA_ZIP} s3://${S3_BUCKET}/${LAMBDA_ZIP}
-                '''
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'aws-credentials', 
+                        usernameVariable: 'AWS_ACCESS_KEY_ID', 
+                        passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                    )
+                ]) {
+                    sh '''
+                        export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                        export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                        aws s3 cp ${LAMBDA_ZIP} s3://${S3_BUCKET}/${LAMBDA_ZIP}
+                    '''
+                }
             }
         }
         
         stage('Terraform Init') {
             steps {
                 dir('terraform') {
-                    sh 'terraform init'
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: 'aws-credentials', 
+                            usernameVariable: 'AWS_ACCESS_KEY_ID', 
+                            passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                        )
+                    ]) {
+                        sh '''
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                            terraform init
+                        '''
+                    }
                 }
             }
         }
@@ -42,7 +64,19 @@ pipeline {
         stage('Terraform Plan') {
             steps {
                 dir('terraform') {
-                    sh 'terraform plan -out=tfplan'
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: 'aws-credentials', 
+                            usernameVariable: 'AWS_ACCESS_KEY_ID', 
+                            passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                        )
+                    ]) {
+                        sh '''
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                            terraform plan -out=tfplan
+                        '''
+                    }
                 }
             }
         }
@@ -50,7 +84,19 @@ pipeline {
         stage('Terraform Apply') {
             steps {
                 dir('terraform') {
-                    sh 'terraform apply -auto-approve tfplan'
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: 'aws-credentials', 
+                            usernameVariable: 'AWS_ACCESS_KEY_ID', 
+                            passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                        )
+                    ]) {
+                        sh '''
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                            terraform apply -auto-approve tfplan
+                        '''
+                    }
                 }
             }
         }
@@ -63,7 +109,9 @@ pipeline {
                             script: 'terraform output -raw api_endpoint',
                             returnStdout: true
                         ).trim()
+                        echo "=========================================="
                         echo "API Endpoint: ${env.API_ENDPOINT}"
+                        echo "=========================================="
                     }
                 }
             }
@@ -72,22 +120,29 @@ pipeline {
         stage('Test API') {
             steps {
                 sh '''
-                    # Wait for API to be ready
-                    sleep 10
+                    echo "Waiting for API to be ready..."
+                    sleep 15
                     
-                    # Test GET (list items)
-                    echo "Testing GET /items..."
-                    curl -X GET ${API_ENDPOINT}/items
+                    echo "\n========== Testing GET /items (List all) =========="
+                    curl -s -X GET ${API_ENDPOINT}/items || echo "Failed"
                     
-                    # Test POST (create item)
-                    echo "\nTesting POST /items..."
-                    curl -X POST ${API_ENDPOINT}/items \
+                    echo "\n\n========== Testing POST /items (Create item) =========="
+                    curl -s -X POST ${API_ENDPOINT}/items \
                         -H "Content-Type: application/json" \
-                        -d '{"id":"1","name":"Test Item","price":100}'
+                        -d '{"id":"1","name":"Test Item","price":100}' || echo "Failed"
                     
-                    # Test GET single item
-                    echo "\nTesting GET /items/1..."
-                    curl -X GET ${API_ENDPOINT}/items/1
+                    echo "\n\n========== Testing GET /items/1 (Get single item) =========="
+                    curl -s -X GET ${API_ENDPOINT}/items/1 || echo "Failed"
+                    
+                    echo "\n\n========== Testing PUT /items/1 (Update item) =========="
+                    curl -s -X PUT ${API_ENDPOINT}/items/1 \
+                        -H "Content-Type: application/json" \
+                        -d '{"id":"1","name":"Updated Item","price":200}' || echo "Failed"
+                    
+                    echo "\n\n========== Testing DELETE /items/1 (Delete item) =========="
+                    curl -s -X DELETE ${API_ENDPOINT}/items/1 || echo "Failed"
+                    
+                    echo "\n\n========== API Testing Complete =========="
                 '''
             }
         }
@@ -95,10 +150,19 @@ pipeline {
     
     post {
         success {
-            echo 'Deployment successful!'
+            echo '=========================================='
+            echo 'Deployment Successful! ✅'
+            echo 'API Endpoint: Check the "Get API Endpoint" stage'
+            echo '=========================================='
         }
         failure {
-            echo 'Deployment failed!'
+            echo '=========================================='
+            echo 'Deployment Failed! ❌'
+            echo 'Check the console output for errors'
+            echo '=========================================='
+        }
+        always {
+            cleanWs()
         }
     }
 }
