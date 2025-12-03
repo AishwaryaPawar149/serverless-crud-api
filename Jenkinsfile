@@ -2,8 +2,9 @@ pipeline {
     agent any
     
     environment {
+        PATH = "/usr/local/bin:${env.PATH}"  // Ensure Terraform is found
         AWS_DEFAULT_REGION = 'ap-south-1'
-        S3_BUCKET = 'aishwarya-lambda-artifacts-2024'  // Change this to your unique bucket name
+        S3_BUCKET = 'aishwarya-lambda-artifacts-2024'  // Make sure this bucket exists
         LAMBDA_ZIP = 'lambda_function.zip'
     }
     
@@ -13,7 +14,7 @@ pipeline {
                 checkout scm
             }
         }
-
+        
         stage('Install Dependencies') {
             steps {
                 sh '''
@@ -26,8 +27,8 @@ pipeline {
         stage('Package Lambda') {
             steps {
                 sh '''
-                    cd "$WORKSPACE"
-                    zip -r "$LAMBDA_ZIP" lambda_function.py
+                    cd ${WORKSPACE}
+                    zip -r ${LAMBDA_ZIP} lambda_function.py
                 '''
             }
         }
@@ -44,7 +45,7 @@ pipeline {
                     sh '''
                         export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
                         export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-                        aws s3 cp "$LAMBDA_ZIP" s3://$S3_BUCKET/$LAMBDA_ZIP
+                        aws s3 cp ${LAMBDA_ZIP} s3://${S3_BUCKET}/${LAMBDA_ZIP}
                     '''
                 }
             }
@@ -132,26 +133,26 @@ pipeline {
                     echo "Waiting for API to be ready..."
                     sleep 15
                     
-                    echo "\\n========== Testing GET /items (List all) =========="
+                    echo "\n========== Testing GET /items (List all) =========="
                     curl -s -X GET ${API_ENDPOINT}/items || echo "Failed"
                     
-                    echo "\\n\\n========== Testing POST /items (Create item) =========="
+                    echo "\n\n========== Testing POST /items (Create item) =========="
                     curl -s -X POST ${API_ENDPOINT}/items \
                         -H "Content-Type: application/json" \
                         -d '{"id":"1","name":"Test Item","price":100}' || echo "Failed"
                     
-                    echo "\\n\\n========== Testing GET /items/1 (Get single item) =========="
+                    echo "\n\n========== Testing GET /items/1 (Get single item) =========="
                     curl -s -X GET ${API_ENDPOINT}/items/1 || echo "Failed"
                     
-                    echo "\\n\\n========== Testing PUT /items/1 (Update item) =========="
+                    echo "\n\n========== Testing PUT /items/1 (Update item) =========="
                     curl -s -X PUT ${API_ENDPOINT}/items/1 \
                         -H "Content-Type: application/json" \
                         -d '{"id":"1","name":"Updated Item","price":200}' || echo "Failed"
                     
-                    echo "\\n\\n========== Testing DELETE /items/1 (Delete item) =========="
+                    echo "\n\n========== Testing DELETE /items/1 (Delete item) =========="
                     curl -s -X DELETE ${API_ENDPOINT}/items/1 || echo "Failed"
                     
-                    echo "\\n\\n========== API Testing Complete =========="
+                    echo "\n\n========== API Testing Complete =========="
                 '''
             }
         }
