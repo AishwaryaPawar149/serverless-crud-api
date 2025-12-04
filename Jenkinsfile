@@ -2,9 +2,8 @@ pipeline {
     agent any
     
     environment {
-        PATH = "/usr/local/bin:${env.PATH}"  // Ensure Terraform is found
         AWS_DEFAULT_REGION = 'ap-south-1'
-        S3_BUCKET = 'aishwarya-lambda-artifacts-2024'  // Make sure this bucket exists
+        S3_BUCKET = 'aishwarya-lambda-artifacts-2024'
         LAMBDA_ZIP = 'lambda_function.zip'
     }
     
@@ -12,15 +11,6 @@ pipeline {
         stage('Checkout') {
             steps {
                 checkout scm
-            }
-        }
-        
-        stage('Install Dependencies') {
-            steps {
-                sh '''
-                    sudo apt update
-                    sudo apt install -y zip curl unzip
-                '''
             }
         }
         
